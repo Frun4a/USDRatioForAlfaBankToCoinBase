@@ -59,7 +59,7 @@ public class USDRatio {
                 .header("accept", "application/json")
                 .build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        var jsonObject = new JsonParser().parse(response.body()).getAsJsonObject();
+        var jsonObject = JsonParser.parseString(response.body()).getAsJsonObject();
         return jsonObject
                 .get("data").getAsJsonArray()
                 .get(0).getAsJsonObject()
@@ -111,7 +111,8 @@ public class USDRatio {
 
         driver.quit();
 
-        return exchangeRatesAsDoubles.stream().mapToDouble(Double::doubleValue).average().getAsDouble();
+        return exchangeRatesAsDoubles.stream().mapToDouble(Double::doubleValue).average().orElseThrow(() ->
+                new RuntimeException("Unable to calculate average Binance exchange rate"));
     }
 
 }
