@@ -1,6 +1,7 @@
 import com.google.gson.JsonParser;
 import org.apache.http.client.utils.URIBuilder;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -72,11 +73,12 @@ public class USDRatio {
                 .get("originalValue").getAsDouble();
     }
 
-    private static double getAverageBinanceExchangeRate() {
+    private static double getAverageBinanceExchangeRate() throws InterruptedException {
         By closeBannerButtonLocator = By.xpath("//*[local-name()='svg']/*[local-name()='path'" +
                 " and @d='M10.586 12L4.293 5.707 5 5l.707-.707L12 10.586l6.293-6.293L19 5l.707.707L13.414 12l6.293 " +
                 "6.293-1.414 1.414L12 13.414l-6.293 6.293L5 19l-.707-.707L10.586 12z']/..");
-        By adOkButtonLocator = By.xpath("//button[text()='Ok']");
+        //By adOkButtonLocator = By.xpath("//button[text()='Ok']");
+        By pollOkButtonLocator = By.xpath("//button[.='ОК']");
 
         By fiatSelectorLocator = By.xpath("//div[@id='C2Cfiatfilter_searhbox_fiat']");
         By fiatInputLocator = By.xpath("//div[@id='C2Cfiatfilter_searhbox_fiat']" +
@@ -91,25 +93,31 @@ public class USDRatio {
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
         WebDriver driver = new ChromeDriver(options);
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5));
+        driver.manage().window().setSize(new Dimension(1920, 1080));
         var wait = new WebDriverWait(driver, Duration.ofSeconds(10));
+        List<Double> exchangeRatesAsDoubles;
 
-        driver.get("https://p2p.binance.com/ru/trade/TinkoffNew/USDT?fiat=RUB");
-        wait.until(ExpectedConditions.presenceOfElementLocated(closeBannerButtonLocator)).click();
-        wait.until(ExpectedConditions.presenceOfElementLocated(adOkButtonLocator)).click();
+        try {
+            driver.get("https://p2p.binance.com/ru/trade/TinkoffNew/USDT?fiat=RUB");
+            wait.until(ExpectedConditions.presenceOfElementLocated(closeBannerButtonLocator)).click();
+            //wait.until(ExpectedConditions.presenceOfElementLocated(adOkButtonLocator)).click();
+            wait.until(ExpectedConditions.presenceOfElementLocated(pollOkButtonLocator)).click();
 
-        driver.findElement(fiatSelectorLocator).click();
-        driver.findElement(fiatInputLocator).sendKeys("RUB");
-        driver.findElement(rubButtonLocator).click();
+            driver.findElement(fiatSelectorLocator).click();
+            driver.findElement(fiatInputLocator).sendKeys("RUB");
+            driver.findElement(rubButtonLocator).click();
 
-        driver.findElement(paymentMethodSelectorLocator).click();
-        wait.until(ExpectedConditions.presenceOfElementLocated(tinkoffPaymentOptionLocator)).click();
+            driver.findElement(paymentMethodSelectorLocator).click();
+            wait.until(ExpectedConditions.presenceOfElementLocated(tinkoffPaymentOptionLocator)).click();
 
-        wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(rateValuesLocator, 8));
-        List<WebElement> exchangeRates = driver.findElements(rateValuesLocator);
+            wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(rateValuesLocator, 8));
+            List<WebElement> exchangeRates = driver.findElements(rateValuesLocator);
 
-        var exchangeRatesAsDoubles = exchangeRates.stream().map(el -> Double.valueOf(el.getText())).toList();
-
-        driver.quit();
+            exchangeRatesAsDoubles = exchangeRates.stream().map(el -> Double.valueOf(el.getText())).toList();
+        } finally {
+            driver.quit();
+        }
 
         return exchangeRatesAsDoubles.stream().mapToDouble(Double::doubleValue).average().orElseThrow(() ->
                 new RuntimeException("Unable to calculate average Binance exchange rate"));
