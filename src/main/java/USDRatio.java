@@ -20,14 +20,23 @@ import java.util.List;
 
 public class USDRatio {
 
-    public static void main(String[] args) throws IOException, InterruptedException, URISyntaxException {
+    public static void main(String[] args) {
         System.setProperty("webdriver.chrome.driver", "src/main/resources/chromedriverMac");
 
         int AMOUNT = 2000;
         int COINBASE_FEE = 30;
+        double ALFA_USD_TO_RUB_RATE = 53.7;
         double TRANSFER_FEE = 0.005;
 
-        var alfaExchangeRate = getAlfaExchangeRate();
+        double alfaExchangeRate;
+        try {
+            System.out.println("Making an attempt to get the Alfa Bank exchange rate via API");
+            alfaExchangeRate = getAlfaExchangeRate();
+        } catch (Exception exception) {
+            System.out.println("Couldn't get the Alfa Bank exchange rate via API, using the constant instead");
+            alfaExchangeRate = ALFA_USD_TO_RUB_RATE;
+        }
+
         var binanceExchangeRate = getAverageBinanceExchangeRate();
 
         var amountToTransferInRub = AMOUNT * alfaExchangeRate * (1 - TRANSFER_FEE);
@@ -58,6 +67,7 @@ public class USDRatio {
         var client = HttpClient.newHttpClient();
         var request = HttpRequest.newBuilder(requestURL)
                 .header("accept", "application/json")
+                .timeout(Duration.ofSeconds(3))
                 .build();
         var response = client.send(request, HttpResponse.BodyHandlers.ofString());
         var jsonObject = JsonParser.parseString(response.body()).getAsJsonObject();
@@ -73,7 +83,7 @@ public class USDRatio {
                 .get("originalValue").getAsDouble();
     }
 
-    private static double getAverageBinanceExchangeRate() throws InterruptedException {
+    private static double getAverageBinanceExchangeRate() {
         By closeBannerButtonLocator = By.xpath("//*[local-name()='svg']/*[local-name()='path'" +
                 " and @d='M10.586 12L4.293 5.707 5 5l.707-.707L12 10.586l6.293-6.293L19 5l.707.707L13.414 12l6.293 " +
                 "6.293-1.414 1.414L12 13.414l-6.293 6.293L5 19l-.707-.707L10.586 12z']/..");
@@ -89,6 +99,8 @@ public class USDRatio {
         By paymentMethodSelectorLocator = By.xpath("//div[@id='C2Cpaymentfilter_searchbox_payment']");
         By tinkoffPaymentOptionLocator = By.xpath("//ul//li[@id='Тинькофф']");
         By rateValuesLocator = By.xpath("//button[.='Купить USDT']/../../../div[2]/div/div/div[1]");
+        By amountInputLocator = By.id("C2Csearchamount_searchbox_amount");
+        By amountInputSearchButtonLocator = By.id("C2Csearchamount_btn_search");
 
         ChromeOptions options = new ChromeOptions();
         options.setHeadless(true);
@@ -110,6 +122,9 @@ public class USDRatio {
 
             driver.findElement(paymentMethodSelectorLocator).click();
             wait.until(ExpectedConditions.presenceOfElementLocated(tinkoffPaymentOptionLocator)).click();
+
+            driver.findElement(amountInputLocator).sendKeys("50000");
+            driver.findElement(amountInputSearchButtonLocator).click();
 
             wait.until(ExpectedConditions.numberOfElementsToBeMoreThan(rateValuesLocator, 8));
             List<WebElement> exchangeRates = driver.findElements(rateValuesLocator);
